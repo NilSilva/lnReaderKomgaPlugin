@@ -7,3 +7,5 @@ I had issues with cors and fixed it with a proxy. [Here](https://4bit.dev/posts/
 To add it to the app I created my personal repository by using caddy and serving the plugin through that.
 
 Other than that just put your komga server url in the site variable. You can also add library filter by following the example commented out.
+
+You will have to login using webview before it will work.
