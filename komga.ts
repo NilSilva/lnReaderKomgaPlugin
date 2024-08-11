@@ -1,43 +1,30 @@
 import { Plugin } from '@typings/plugin';
 import { Filters, FilterTypes } from '@libs/filterInputs';
 import { NovelStatus } from '@libs/novelStatus';
+import { fetchApi } from '@libs/fetch';
 
 class KomgaPlugin implements Plugin.PluginBase {
     id = 'komga';
     name = 'Komga';
     icon = '';
     site = 'https://example.com/';
-    version = '1.0.0';
+    version = '1.0.1';
 
-    makeRequest(method: string, url: string): Promise<string> {
-        return new Promise(function (resolve, reject) {
-            let xhr = new XMLHttpRequest();
-            xhr.open(method, url);
-            xhr.setRequestHeader("Content-Type", "application/json");
-            xhr.onload = function () {
-                if (this.status >= 200 && this.status < 300) {
-                    resolve(xhr.response);
-                } else {
-                    reject({
-                        status: this.status,
-                        statusText: xhr.statusText
-                    });
-                }
-            };
-            xhr.onerror = function () {
-                reject({
-                    status: this.status,
-                    statusText: xhr.statusText
-                });
-            };
-            xhr.send();
-        });
+    async makeRequest(url: string): Promise<string> {
+        return await fetchApi(url, {
+            headers: {
+                Accept: 'application/json, text/plain, */*',
+                'Content-Type': 'application/json;charset=utf-8',
+            },
+            Referer: this.site
+        }).then(res => res.text());
+
     }
 
     async getSeries(url: string): Promise<Plugin.NovelItem[]> {
         const novels: Plugin.NovelItem[] = [];
 
-        var response = await this.makeRequest("get", url);
+        var response = await this.makeRequest(url);
 
         const series = JSON.parse(response).content;
 
@@ -73,7 +60,7 @@ class KomgaPlugin implements Plugin.PluginBase {
 
         const url = this.site + novelPath
 
-        var response = await this.makeRequest("get", url);
+        var response = await this.makeRequest(url);
 
         const series = JSON.parse(response);
 
@@ -105,18 +92,18 @@ class KomgaPlugin implements Plugin.PluginBase {
 
         const chapters: Plugin.ChapterItem[] = [];
 
-        const booksResponse = await this.makeRequest("get", this.site + `api/v1/series/${series.id}/books`)
+        const booksResponse = await this.makeRequest(this.site + `api/v1/series/${series.id}/books?unpaged=true`)
 
         const booksData = JSON.parse(booksResponse).content;
 
         for (let book of booksData) {
-            const bookManifestResponse = await this.makeRequest("get", this.site + `api/v1/books/${book.id}/manifest`);
+            const bookManifestResponse = await this.makeRequest(this.site + `api/v1/books/${book.id}/manifest`);
 
             const bookManifest = JSON.parse(bookManifestResponse);
-            let i = 0;
+            let i = 1;
             for (let page of bookManifest.readingOrder) {
                 chapters.push({
-                    name: `${i} - ${book.metadata.title}`,
+                    name: `${i}/${bookManifest.readingOrder.length} - ${book.metadata.title}`,
                     path: 'api/v1' + page.href.split('api/v1').pop()
                 })
                 i++;
@@ -126,9 +113,9 @@ class KomgaPlugin implements Plugin.PluginBase {
         novel.chapters = chapters;
         return novel;
     }
-
+    
     async parseChapter(chapterPath: string): Promise<string> {
-        const chapterText = await this.makeRequest("get", this.site + chapterPath);
+        const chapterText = await this.makeRequest(this.site + chapterPath);
         return chapterText;
     }
 
