@@ -8,7 +8,7 @@ class KomgaPlugin implements Plugin.PluginBase {
   name = 'Komga';
   icon = '';
   site = 'https://example.com/';
-  version = '1.0.3';
+  version = '1.0.4';
 
   async makeRequest(url: string): Promise<string> {
     return await fetchApi(url, {
@@ -27,7 +27,7 @@ class KomgaPlugin implements Plugin.PluginBase {
       acc.push(rest);
 
       if (children) {
-        acc.push(...children);
+        acc.push(...this.flattenArray(children));
       }
 
       return acc;
