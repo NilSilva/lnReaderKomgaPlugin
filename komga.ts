@@ -8,7 +8,9 @@ class KomgaPlugin implements Plugin.PluginBase {
   name = 'Komga';
   icon = '';
   site = 'https://example.com/';
-  version = '1.0.4';
+  version = '1.0.5';
+
+  includedLibraries = ['<Library 1 ID>', '<Library 2 ID>']
 
   async makeRequest(url: string): Promise<string> {
     return await fetchApi(url, {
@@ -18,7 +20,6 @@ class KomgaPlugin implements Plugin.PluginBase {
       },
       Referer: this.site
     }).then(res => res.text());
-
   }
 
   flattenArray(arr: any) {
@@ -64,7 +65,17 @@ class KomgaPlugin implements Plugin.PluginBase {
     const status = filters?.status.value ? ('&status=' + filters?.status.value) : '';
     const sort = showLatestNovels ? 'lastModified,desc' : 'name,asc';
 
-    const url = `${this.site}api/v1/series?page=${(pageNo - 1)}${library}${read_status}${status}&sort=${sort}`
+    let includedLibraries = ""
+
+    this.includedLibraries.forEach(id => {
+      if (includedLibraries === "") {
+        includedLibraries = `&library_id=${id}`;
+      } else {
+        includedLibraries = `${includedLibraries}&library_id=${id}`
+      }
+    })
+
+    const url = `${this.site}api/v1/series?page=${(pageNo - 1)}${library}${read_status}${status}&sort=${sort}${library ? library : includedLibraries}`
 
     return await this.getSeries(url);
   }
@@ -122,7 +133,7 @@ class KomgaPlugin implements Plugin.PluginBase {
 
       let i = 1;
       for (let page of bookManifest.readingOrder) {
-        const tocItem = toc.find((v: any) => v.href.split('#')[0] === page.href);
+        const tocItem = toc.find((v: any) => v.href?.split('#')[0] === page.href);
         const title = tocItem ? tocItem.title : null
         chapters.push({
           name: `${i}/${bookManifest.readingOrder.length} - ${book.metadata.title}${title ? " - " + title : ''}`,
@@ -144,7 +155,17 @@ class KomgaPlugin implements Plugin.PluginBase {
     searchTerm: string,
     pageNo: number,
   ): Promise<Plugin.NovelItem[]> {
-    const url = `${this.site}api/v1/series?search=${searchTerm}&page=${(pageNo - 1)}`
+    let includedLibraries = ""
+
+    this.includedLibraries.forEach(id => {
+      if (includedLibraries === "") {
+        includedLibraries = `&library_id=${id}`;
+      } else {
+        includedLibraries = `${includedLibraries}&library_id=${id}`
+      }
+    })
+
+    const url = `${this.site}api/v1/series?search=${searchTerm}&page=${(pageNo - 1)}${includedLibraries ? includedLibraries : ""}`
 
     return await this.getSeries(url);
   }
