@@ -1,14 +1,22 @@
-import { Plugin } from '@typings/plugin';
+import { fetchApi } from '@libs/fetch';
 import { Filters, FilterTypes } from '@libs/filterInputs';
 import { NovelStatus } from '@libs/novelStatus';
-import { fetchApi } from '@libs/fetch';
+import { Plugin } from '@typings/plugin';
+import { load as parseHTML } from 'cheerio';
 
 class KomgaPlugin implements Plugin.PluginBase {
   id = 'komga';
   name = 'Komga';
   icon = '';
-  site = 'https://example.com/';
-  version = '1.0.5';
+  version = '1.0.6';
+
+  // Get url, password, email from storage or hardcode them in
+  // site = storage.get("url");
+  site = "https://example.com/"
+  // email = storage.get("email");
+  email = "";
+  // password = storage.get("password");
+  password = "";
 
   includedLibraries = ['<Library 1 ID>', '<Library 2 ID>']
 
@@ -17,9 +25,31 @@ class KomgaPlugin implements Plugin.PluginBase {
       headers: {
         Accept: 'application/json, text/plain, */*',
         'Content-Type': 'application/json;charset=utf-8',
+        "Authorization": `Basic ${this.btoa(this.email + ":" + this.password)}`
       },
       Referer: this.site
     }).then(res => res.text());
+  }
+
+  btoa(input: string = '') {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    let str = input;
+    let output = '';
+
+    for (let block = 0, charCode, i = 0, map = chars;
+      str.charAt(i | 0) || (map = '=', i % 1);
+      output += map.charAt(63 & block >> 8 - i % 1 * 8)) {
+
+      charCode = str.charCodeAt(i += 3 / 4);
+
+      if (charCode > 0xFF) {
+        throw new Error("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
+      }
+
+      block = block << 8 | charCode;
+    }
+
+    return output;
   }
 
   flattenArray(arr: any) {
@@ -137,7 +167,7 @@ class KomgaPlugin implements Plugin.PluginBase {
         const title = tocItem ? tocItem.title : null
         chapters.push({
           name: `${i}/${bookManifest.readingOrder.length} - ${book.metadata.title}${title ? " - " + title : ''}`,
-          path: 'opds/v2' + page.href.split('opds/v2').pop()
+          path: 'opds/v2' + page.href?.split('opds/v2').pop()
         })
         i++;
       }
@@ -148,8 +178,38 @@ class KomgaPlugin implements Plugin.PluginBase {
   }
   async parseChapter(chapterPath: string): Promise<string> {
     const chapterText = await this.makeRequest(this.site + chapterPath);
-    return chapterText;
+    return this.addUrlToImageHref(chapterText, this.site + chapterPath.split("/").slice(0, -1).join("/") + '/');
   }
+
+  addUrlToImageHref(htmlString: string, baseUrl: string): string  {
+    const $ = parseHTML(htmlString, { xmlMode: true });
+
+    // Replace all image elements to img and add url to src
+    $('svg image').each((_, image) => {
+        const href = $(image).attr('href') || $(image).attr('xlink:href');
+        const width = $(image).attr('width');
+        const height = $(image).attr('height');
+
+        if (href) {
+            const img = $('<img />').attr({
+                src: href.startsWith('http') ? href : `${baseUrl}${href}`,
+                width: width || undefined,
+                height: height || undefined
+            });
+            $(image).closest('svg').replaceWith(img);
+        }
+    });
+
+    // Add url to src
+    $('img').each((_, img) => {
+        const src = $(img).attr('src');
+        if (src && !src.startsWith("http")) {
+            $(img).attr('src', `${baseUrl}${src}`);
+        }
+    });
+
+    return $.xml();
+}
 
   async searchNovels(
     searchTerm: string,
@@ -204,6 +264,23 @@ class KomgaPlugin implements Plugin.PluginBase {
       type: FilterTypes.Picker,
     },
   } satisfies Filters;
+
+  // Plugin settings to be configured by user
+  pluginSettings = {
+    email: {
+      value: "",
+      label: "Email",
+      type: "Text"
+    },
+    password: {
+      value: "",
+      label: "Password"
+    },
+    url: {
+      value: "",
+      label: "URL"
+    }
+  };
 }
 
 export default new KomgaPlugin();
